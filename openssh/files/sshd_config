@@ -22,6 +22,7 @@ HostKey /etc/ssh/ssh_host_dsa_key
 {%- if grains.os_family != 'CentOS' %}
 HostKey /etc/ssh/ssh_host_ecdsa_key
 {%- endif %}
+HostKey /etc/ssh/ssh_host_ed25519_key
 #Privilege Separation is turned on for security
 UsePrivilegeSeparation yes
 

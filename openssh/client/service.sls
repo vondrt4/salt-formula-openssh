@@ -3,13 +3,13 @@
 {%- if client.enabled %}
 
 openssh_client_packages:
-  pkg.installed:
+  pkg.latest:
   - names: {{ client.pkgs }}
 
 {%- if network.proxy.host != 'none' and not network.proxy.get("pkg_only", true) %}
 
 openssh_client_proxy_packages:
-  pkg.installed:
+  pkg.latest:
   - names: {{ client.proxy_pkgs }}
 
 {%- endif %}
@@ -25,12 +25,14 @@ openssh_client_config:
   - require:
     - pkg: openssh_client_packages
 
-{%- for user_name, user in client.user.iteritems() %}
+{%- for user_name, user in client.get('user', {}).iteritems() %}
+
+{%- if user.get('enabled', True) %}
 
 {{ user.user.home }}/.ssh:
   file.directory:
   - user: {{ user.user.name }}
-  - mode: 755
+  - mode: 700
   - makedirs: true
   - require:
     - pkg: openssh_client_packages
@@ -44,6 +46,8 @@ openssh_client_{{ user_name }}_config:
   - template: jinja
   - require:
     - pkg: openssh_client_packages
+
+{%- endif %}
 
 {%- endfor %}
 

@@ -3,11 +3,18 @@
 # Package generated configuration file
 # See the sshd_config(5) manpage for details
 
+{%- if server.binds is defined %}
+{%- for bind in server.binds %}
+ListenAddress {{ bind.address|default("0.0.0.0") }}:{{ bind.port|default("22") }}
+{%- endfor %}
+{%- else %}
 # What ports, IPs and protocols we listen for
-Port 22
+Port {{ server.bind.port }}
+
 # Use these options to restrict which interfaces/protocols sshd will bind to
-#ListenAddress ::
-#ListenAddress 0.0.0.0
+ListenAddress {{ server.bind.address }}
+{%- endif %}
+
 Protocol 2
 # HostKeys for protocol version 2
 HostKey /etc/ssh/ssh_host_rsa_key
@@ -21,7 +28,7 @@ UsePrivilegeSeparation yes
 
 # Lifetime and size of ephemeral version 1 server key
 KeyRegenerationInterval 3600
-ServerKeyBits 1024
+ServerKeyBits {{ server.get('server_key_bits', '2048') }}
 
 # Logging
 SyslogFacility AUTH
@@ -38,6 +45,29 @@ RSAAuthentication yes
 
 PubkeyAuthentication {% if server.get('public_key_auth', True) %}yes{% else %}no{% endif %}
 AuthorizedKeysFile     %h/.ssh/authorized_keys
+
+{%- if server.authorized_keys_command is defined %}
+AuthorizedKeysCommand {{ server.authorized_keys_command.command }}
+{% if (grains['os_family'] == 'RedHat' and grains['osmajorrelease'] != '6') or grains['os_family'] != 'RedHat' %}
+{%- if server.authorized_keys_command.user is defined %}
+AuthorizedKeysCommandUser {{ server.authorized_keys_command.get('User', 'nobody') }}
+{%- endif %}
+{%- endif %}
+{%- endif %}
+
+
+{% if server.get('deny_users', False) %}
+DenyUsers {{ server.deny_users|join(' ') }}
+{% endif %}
+{% if server.get('allow_users', False) %}
+AllowUsers {{ server.allow_users|join(' ') }}
+{% endif %}
+{% if server.get('deny_groups', False) %}
+DenyGroups {{ server.deny_groups|join(' ') }}
+{% endif %}
+{% if server.get('allow_groups', False) %}
+AllowGroups {{ server.allow_groups|join(' ') }}
+{% endif %}
 
 # Don't read the user's ~/.rhosts and ~/.shosts files
 IgnoreRhosts yes
@@ -61,19 +91,27 @@ ChallengeResponseAuthentication no
 PasswordAuthentication {% if server.get('password_auth', True) %}yes{% else %}no{% endif %}
 
 # Kerberos options
-#KerberosAuthentication no
+{%- if server.get('kerberos_auth', False) %}
+KerberosAuthentication yes
+{%- else %}
+KerberosAuthentication no
+{%- endif %}
 #KerberosGetAFSToken no
 #KerberosOrLocalPasswd yes
 #KerberosTicketCleanup yes
 
 # GSSAPI options
-#GSSAPIAuthentication no
+{%- if server.get('gssapi_auth', False) %}
+GSSAPIAuthentication yes
+{%- else %}
+GSSAPIAuthentication no
+{%- endif %}
 #GSSAPICleanupCredentials yes
 
-X11Forwarding yes
-X11DisplayOffset 10
-PrintMotd no
-PrintLastLog yes
+X11Forwarding {% if server.get('x11', {}).get('forwarding', True) %}yes{% else %}no{% endif %}
+X11DisplayOffset {{ server.get('x11', {}).get('display_offset', '10') }}
+PrintMotd {% if server.get('print_motd', False) %}yes{% else %}no{% endif %}
+PrintLastLog {% if server.get('print_lastlog', True) %}yes{% else %}no{% endif %}
 TCPKeepAlive yes
 #UseLogin no
 
@@ -96,6 +134,9 @@ Banner /etc/banner
 
 # Allow client to pass locale environment variables
 AcceptEnv LANG LC_*
+{%- if server.get('accept_env', [])|length > 0 %}
+AcceptEnv {{ server.accept_env|join(' ') }}
+{%- endif %}
 
 Subsystem sftp {{ server.lib_dir }}/sftp-server
 
